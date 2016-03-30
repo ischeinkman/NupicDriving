@@ -3,6 +3,9 @@ package com.ilanscheinkman.nupicdriving;
 import android.content.Context;
 
 /**
+ * A class for the storing and loading of contexts statically,
+ * so that presenters will be able to access context without having
+ * to rely on their views to pass them in.
  * Created by ilan on 3/24/16.
  */
 public class ContextManager {
