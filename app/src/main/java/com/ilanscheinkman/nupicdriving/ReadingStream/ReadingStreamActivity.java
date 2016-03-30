@@ -102,12 +102,12 @@ public class ReadingStreamActivity extends AppCompatActivity implements ReadingS
 
     @Override
     public void showPlay() {
-        playPauseButton.setImageResource(R.drawable.ic_play_arrow_white);
+        playPauseButton.setImageResource(R.drawable.ic_pause_white); //Click the pause button to pause
     }
 
     @Override
     public void showPause() {
-        playPauseButton.setImageResource(R.drawable.ic_pause_white);
+        playPauseButton.setImageResource(R.drawable.ic_play_arrow_white); //Click the play button to start playing
     }
 
     @Override
@@ -117,6 +117,10 @@ public class ReadingStreamActivity extends AppCompatActivity implements ReadingS
 
     @Override
     public void showDeviceOptions(final List<BluetoothWrapper> deviceList) {
+        if (deviceList == null || deviceList.size() == 0){
+            showText("No devices found.");
+            return;
+        }
         String[] names = new String[deviceList.size()];
         for (int i = 0; i< names.length; i++) names[i] = deviceList.get(i).getName();
         AlertDialog.Builder builder = new AlertDialog.Builder(this);

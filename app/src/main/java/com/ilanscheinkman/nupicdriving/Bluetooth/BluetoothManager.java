@@ -10,7 +10,6 @@ import java.util.UUID;
 import rx.Observable;
 import rx.functions.Action1;
 import rx.functions.Func1;
-import rx.schedulers.Schedulers;
 
 /**
  * A class for connecting to the OBD device via bluetooth.
@@ -39,15 +38,13 @@ public class BluetoothManager {
                     return new BluetoothWrapperImpl(device);
                 }
             });
-            stream.subscribeOn(Schedulers.io());
             stream.doOnError(new Action1<Throwable>() {
                 @Override
                 public void call(Throwable throwable) {
                     bluetooth.cancelDiscovery();
                 }
             });
-            stream.publish().connect();
-            return stream;
+            return stream.publish().autoConnect();
         }
         else return Observable.error(new Exception("Bluetooth not enabled."));
     }

@@ -12,7 +12,9 @@ import java.util.List;
 import java.util.concurrent.TimeUnit;
 
 import rx.Observable;
+import rx.android.schedulers.AndroidSchedulers;
 import rx.functions.Action1;
+import rx.schedulers.Schedulers;
 
 /**
  * Created by ilan on 3/24/16.
@@ -24,10 +26,19 @@ public class ReadingStreamPresenterImpl implements ReadingStreamPresenter {
     private boolean paused;
     private DbHelper dbHelper;
 
+    public ReadingStreamPresenterImpl(){
+        paused = true;
+    }
+
     public ReadingStreamPresenterImpl(View view){
         this.view = view;
         paused = true;
         view.showPause();
+    }
+
+    public void setView(View view){
+        this.view = view;
+        onPause(); //We pause so as not to leak old observables.
     }
 
 
@@ -61,13 +72,15 @@ public class ReadingStreamPresenterImpl implements ReadingStreamPresenter {
     }
 
     public void onPause() {
-        manager.stop();
+        if (manager != null) manager.stop();
         paused = true;
         view.showPause();
     }
 
     @Override
     public void onPlayPause() {
+        if (view == null) return; //Cannot display so won't do unnecessary work.
+
         if (paused){
             onResume();
             paused = false;
@@ -80,8 +93,11 @@ public class ReadingStreamPresenterImpl implements ReadingStreamPresenter {
 
     @Override
     public void connectBluetooth(BluetoothWrapper device) {
+        if (view == null) return; //Cannot display so won't do unnecessary work.
+
         view.showLoading();
         try {
+            if (!device.isConnected()) device.connect();
             manager = new ObdManager(device.getInputStream(), device.getOutputStream());
         } catch (IOException e) {
             view.hideLoading();
@@ -93,12 +109,13 @@ public class ReadingStreamPresenterImpl implements ReadingStreamPresenter {
 
     @Override
     public void getBluetoothOptions() {
+        if (view == null) return; //Cannot display so won't do unnecessary work.
+        view.showLoading();
         Observable<BluetoothWrapper> devices = BluetoothManager.scanForDevice(ContextManager.getAppContext());
-        Observable<List<BluetoothWrapper>> deviceList = devices.buffer(1, TimeUnit.SECONDS, 3).first();
+        Observable<List<BluetoothWrapper>> deviceList = devices.buffer(5, TimeUnit.SECONDS, 3).first().subscribeOn(Schedulers.io()).observeOn(AndroidSchedulers.mainThread());
         deviceList.subscribe(new Action1<List<BluetoothWrapper>>() {
             @Override
-            public void call(List<BluetoothWrapper> devices) {
-                view.hideLoading();
+            public void call(List<BluetoothWrapper> devices) {view.hideLoading();
                 view.showDeviceOptions(devices);
             }
         }, new Action1<Throwable>() {
