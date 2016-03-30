@@ -140,5 +140,6 @@ public class ReadingStreamActivity extends AppCompatActivity implements ReadingS
                 dialog.dismiss();
             }
         });
+        builder.create().show();
     }
 }
