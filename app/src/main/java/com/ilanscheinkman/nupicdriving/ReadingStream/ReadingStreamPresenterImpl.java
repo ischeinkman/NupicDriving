@@ -14,6 +14,7 @@ import java.util.concurrent.TimeUnit;
 import rx.Observable;
 import rx.android.schedulers.AndroidSchedulers;
 import rx.functions.Action1;
+import rx.functions.Func1;
 import rx.schedulers.Schedulers;
 
 /**
@@ -28,12 +29,12 @@ public class ReadingStreamPresenterImpl implements ReadingStreamPresenter {
 
     public ReadingStreamPresenterImpl(){
         paused = true;
+        dbHelper = new DbHelper(ContextManager.getAppContext());
     }
 
     public ReadingStreamPresenterImpl(View view){
-        this.view = view;
-        paused = true;
-        view.showPause();
+        this();
+        setView(view);
     }
 
     public void setView(View view){
@@ -42,36 +43,37 @@ public class ReadingStreamPresenterImpl implements ReadingStreamPresenter {
     }
 
 
-
-    public void onResume() {
+    private void onResume() {
         view.showLoading();
-        if (manager == null){
+        if (manager == null) {
             view.hideLoading();
             view.showText("No Bluetooth device currently connected.");
+            return;
         }
-        else{
-            view.clearReadings();
-            dbHelper = new DbHelper(ContextManager.getAppContext());
-            Observable<CarReading> readings = manager.start();
-            readings.subscribe(new Action1<CarReading>() {
-                @Override
-                public void call(CarReading carReading) {
-                    dbHelper.insertReading(carReading);
-                }
-            }, new Action1<Throwable>() {
-                @Override
-                public void call(Throwable throwable) {
-                    view.showText(throwable.getMessage());
-                }
-            });
-            view.displayReadings(readings);
-            view.hideLoading();
-            paused = false;
-            view.showPlay();
-        }
+        view.clearReadings();
+        Observable<CarReading> readings = manager.start();
+
+        //We store readings into the database 5 at a time.
+        readings.buffer(5).flatMap(new Func1<List<CarReading>, Observable<?>>() {
+            @Override
+            public Observable<?> call(List<CarReading> carReadings) {
+                return dbHelper.insertReadings(carReadings);
+            }
+        }).doOnError(new Action1<Throwable>() {
+            @Override
+            public void call(Throwable throwable) {
+                view.showText(throwable.getMessage());
+            }
+        });
+
+        //We display them in real time.
+        view.displayReadings(readings);
+        view.hideLoading();
+        paused = false;
+        view.showPlay();
     }
 
-    public void onPause() {
+    private void onPause() {
         if (manager != null) manager.stop();
         paused = true;
         view.showPause();
@@ -102,7 +104,6 @@ public class ReadingStreamPresenterImpl implements ReadingStreamPresenter {
         } catch (IOException e) {
             view.hideLoading();
             view.showText(e.getMessage());
-            return;
         }
 
     }

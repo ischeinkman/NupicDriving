@@ -8,8 +8,12 @@ import android.database.sqlite.SQLiteOpenHelper;
 
 import com.ilanscheinkman.nupicdriving.Model.CarReading;
 
+import java.util.Collection;
+
 import rx.Observable;
 import rx.Subscriber;
+import rx.observables.ConnectableObservable;
+import rx.schedulers.Schedulers;
 
 /**
  * Interacts with the Car Reading database.
@@ -24,6 +28,15 @@ public class DbHelper extends SQLiteOpenHelper{
         super(context, NAME, null, VERSION);
     }
 
+    private static CarReading readReadingFromCursor(Cursor cursor) throws Exception {
+        CarReading outReading = new CarReading();
+        outReading.setTimeStamp(cursor.getLong(cursor.getColumnIndexOrThrow(DbContract.ReadingTable.TIMESTAMP)));
+        for (String field : DbContract.ReadingTable.GetFields()) {
+            outReading.putReading(field, cursor.getLong(cursor.getColumnIndexOrThrow(field)));
+        }
+        return outReading;
+    }
+
     @Override
     public void onCreate(SQLiteDatabase db) {
         db.execSQL(DbContract.ReadingTable.CreateTable());
@@ -34,14 +47,34 @@ public class DbHelper extends SQLiteOpenHelper{
         //TODO: Check if we changed ObdManager.FIELDS and add/remove fields as necessary.
     }
 
-    public boolean insertReadings(CarReading... readings){
-        boolean rval = true;
-        for (CarReading reading : readings){
-            if (!insertReading(reading)) rval = false;
-        }
+    public Observable<CarReading> insertReadings(Collection<? extends CarReading> readings) {
+        CarReading[] readingsarray = new CarReading[readings.size()];
+        readings.toArray(readingsarray);
+        return insertReadings(readingsarray);
+    }
+
+    public Observable<CarReading> insertReadings(final CarReading... readings) {
+        Observable<CarReading> rval = Observable.create(new Observable.OnSubscribe<CarReading>() {
+            @Override
+            public void call(Subscriber<? super CarReading> subscriber) {
+                SQLiteDatabase db = getWritableDatabase();
+                for (CarReading reading : readings) {
+                    if (!insertReading(reading, db)) {
+                        db.close();
+                        subscriber.onError(new Throwable("Could not insert record with timestamp: " + reading.getTimeStamp()));
+                    } else {
+                        subscriber.onNext(reading);
+                    }
+                }
+                db.close();
+                subscriber.onCompleted();
+            }
+        }).publish().subscribeOn(Schedulers.io());
+        ((ConnectableObservable) rval).connect();
         return rval;
     }
-    public boolean insertReading(CarReading reading){
+
+    private boolean insertReading(CarReading reading, SQLiteDatabase db) {
         ContentValues vals = new ContentValues();
         vals.put(DbContract.ReadingTable._ID, reading.getReadingMap().hashCode());
         vals.put(DbContract.ReadingTable.TIMESTAMP, reading.getTimeStamp());
@@ -49,10 +82,7 @@ public class DbHelper extends SQLiteOpenHelper{
         for (String field: fields){
             vals.put(field, reading.getReading(field));
         }
-
-        SQLiteDatabase db = getWritableDatabase();
         long newrow = db.insert(DbContract.ReadingTable.TABLE_NAME, null, vals);
-        db.close();
         return newrow != -1;
     }
 
@@ -62,15 +92,13 @@ public class DbHelper extends SQLiteOpenHelper{
         String[] allFields = new String[DbContract.ReadingTable.GetFields().length +1];
         allFields[0] = DbContract.ReadingTable.TIMESTAMP;
         String[] fieldsWithoutTimestamp = DbContract.ReadingTable.GetFields();
-        for (int i = 1; i<allFields.length; i++){
-            allFields[i] = fieldsWithoutTimestamp[i-1];
-        }
+        System.arraycopy(fieldsWithoutTimestamp, 0, allFields, 1, allFields.length - 1);
 
         if (sortOrder == null) sortOrder = DbContract.ReadingTable.TIMESTAMP+" DESC";
         SQLiteDatabase db = getReadableDatabase();
         final Cursor cursor = db.query(DbContract.ReadingTable.TABLE_NAME, allFields, selection, selectionArgs,null,null, sortOrder);
         cursor.moveToFirst();
-        Observable<CarReading> out = Observable.create(new Observable.OnSubscribe<CarReading>() {
+        return Observable.create(new Observable.OnSubscribe<CarReading>() {
             @Override
             public void call(Subscriber<? super CarReading> subscriber) {
                 while (!cursor.isAfterLast()){
@@ -84,15 +112,5 @@ public class DbHelper extends SQLiteOpenHelper{
                 subscriber.onCompleted();
             }
         });
-        return out;
-    }
-
-    private static final CarReading readReadingFromCursor(Cursor cursor) throws Exception{
-        CarReading outReading = new CarReading();
-        outReading.setTimeStamp(cursor.getLong(cursor.getColumnIndexOrThrow(DbContract.ReadingTable.TIMESTAMP)));
-        for (String field : DbContract.ReadingTable.GetFields()){
-            outReading.putReading(field, cursor.getLong(cursor.getColumnIndexOrThrow(field)));
-        }
-        return outReading;
     }
 }

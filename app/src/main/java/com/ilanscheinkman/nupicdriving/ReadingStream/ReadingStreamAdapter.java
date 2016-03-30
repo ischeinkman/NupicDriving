@@ -1,7 +1,6 @@
 package com.ilanscheinkman.nupicdriving.ReadingStream;
 
 import android.support.v7.widget.RecyclerView;
-import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
@@ -32,7 +31,6 @@ public class ReadingStreamAdapter extends RecyclerView.Adapter<ReadingStreamAdap
             @Override
             public void call(CarReading reading) {
                 allReadings.add(reading);
-                Log.d("Adapter", String.format("HAVE %d READINGS", allReadings.size()));
                 notifyItemRangeChanged(0,allReadings.size());
                 notifyDataSetChanged();
             }
