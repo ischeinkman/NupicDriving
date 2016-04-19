@@ -2,7 +2,6 @@ package com.ilanscheinkman.nupicdriving.ReadingStream;
 
 import com.ilanscheinkman.nupicdriving.Bluetooth.BluetoothManager;
 import com.ilanscheinkman.nupicdriving.Bluetooth.BluetoothWrapper;
-import com.ilanscheinkman.nupicdriving.ContextManager;
 import com.ilanscheinkman.nupicdriving.Database.DbHelper;
 import com.ilanscheinkman.nupicdriving.Model.CarReading;
 import com.ilanscheinkman.nupicdriving.Model.ObdManager;
@@ -29,7 +28,6 @@ public class ReadingStreamPresenterImpl implements ReadingStreamPresenter {
 
     public ReadingStreamPresenterImpl(){
         paused = true;
-        dbHelper = new DbHelper(ContextManager.getAppContext());
     }
 
     public ReadingStreamPresenterImpl(View view){
@@ -112,11 +110,12 @@ public class ReadingStreamPresenterImpl implements ReadingStreamPresenter {
     public void getBluetoothOptions() {
         if (view == null) return; //Cannot display so won't do unnecessary work.
         view.showLoading();
-        Observable<BluetoothWrapper> devices = BluetoothManager.scanForDevice(ContextManager.getAppContext());
+        Observable<BluetoothWrapper> devices = BluetoothManager.scanForDevice();
         Observable<List<BluetoothWrapper>> deviceList = devices.buffer(5, TimeUnit.SECONDS, 3).first().subscribeOn(Schedulers.io()).observeOn(AndroidSchedulers.mainThread());
         deviceList.subscribe(new Action1<List<BluetoothWrapper>>() {
             @Override
-            public void call(List<BluetoothWrapper> devices) {view.hideLoading();
+            public void call(List<BluetoothWrapper> devices) {
+                view.hideLoading();
                 view.showDeviceOptions(devices);
             }
         }, new Action1<Throwable>() {
