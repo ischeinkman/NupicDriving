@@ -117,7 +117,11 @@ public class ReadingStreamActivity extends AppCompatActivity implements ReadingS
 
     @Override
     public void showDeviceOptions(final List<BluetoothWrapper> deviceList) {
-        if (deviceList == null || deviceList.size() == 0){
+        if (deviceList == null) {
+            showText("List not found.");
+            return;
+        }
+        if (deviceList.size() == 0){
             showText("No devices found.");
             return;
         }
